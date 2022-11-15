@@ -6,10 +6,10 @@ const app = express();
 const port = 3001;
 
 app.get('/', (req, res) => {
-    res.send('Hello World!')
+    res.send('Bienvenido al recomendador de conciertos!')
 });
 
 
 app.listen(port, () => {
-    console.log(`Example app listening on port ${port}`);
+    console.log(`App listening on port ${port}`);
 });
