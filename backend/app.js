@@ -16,13 +16,11 @@ const session = driver.session();
 
 
 app.get('/', (req, res) => {
-    console.log("LLEGA");
     res.send('Bienvenido al recomendador de conciertos!');
 });
 
 app.post('/registro', (req, res) => {
     const {user, pass} = req.body;
-    console.log(user + " " + pass);
     // Conectar la sesion con la base de datos
 
     // Realizar consulta a la base de datos
@@ -34,13 +32,30 @@ app.post('/registro', (req, res) => {
 // Ejemplo de crear un nodo
 app.post('/crearNodo', (req, res) => {
     const {user, pass} = req.body;
-    console.log(user + " " + pass);
     session.run(`CREATE (u:User {name: "${user}", pass: "${pass}"})`)
         .then(resultado => {
             res.send('Usuario registrado ' + resultado);
     }).catch(error => {
         console.log(error);
     });
+});
+
+app.get('/api/allConcerts', (req, res) => {
+    let query = `MATCH (n:Conciertos) RETURN n`;
+    const request = session.run(query);
+
+    request.then(result => { 
+        
+        let concerts = [];
+
+        result.records.forEach((current) => {
+            let concert = {
+                name: current._fields[0].properties.name
+            };
+            concerts.push(concert);
+        })
+        res.send(concerts);
+    }).catch();
 });
 
 
