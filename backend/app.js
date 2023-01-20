@@ -14,7 +14,8 @@ const user = 'neo4j';
 //const password = 'L3YfEDDGsRRgKIpfawlsjenGyX7bMzX_W5bPjbrQi6E';
 const password = '1234';
 const driver = neo4j.driver(uri, neo4j.auth.basic(user, password));
-const session = driver.session();
+
+var session = driver.session();
 
 var userID = -1;
 
@@ -23,19 +24,9 @@ app.get('/', (req, res) => {
     res.send('Bienvenido al recomendador de conciertos!');
 });
 
-app.post('/registro', (req, res) => {
-    const {user, pass} = req.body;
-    // Conectar la sesion con la base de datos
-
-    // Realizar consulta a la base de datos
-
-    // Ver resultados
-
-});
-
 // Ejemplo de crear un nodo
 app.post('/crearNodo', (req, res) => {
-    const {user, pass} = req.body;
+    const {user, pass} = req.params;
     session.run(`CREATE (u:User {name: "${user}", pass: "${pass}"})`)
         .then(resultado => {
             res.send('Usuario registrado ' + resultado);
@@ -44,32 +35,42 @@ app.post('/crearNodo', (req, res) => {
     });
 });
 
-app.get('/api/login', (req, res) => {
+app.post('/api/login', (req, res) => {
     const {user, pass} = req.body;
-    //let query = `MATCH (u:User) WHERE u.username = '${user}' and u.password = '${pass}' RETURN u`;
-    let query = `MATCH (u:User) WHERE u.name = 'Pedro' RETURN u.userID`;
+    //let query = `MATCH (u:User) WHERE u.username = '${user}' and u.password = '${pass}' RETURN u.username`;
+    let query = `MATCH (u:User) WHERE u.name = '${user}' RETURN u.name`;
     const request = session.run(query);
     request.then(result => { 
         if(result.records.length > 0) {
-            userID = parseInt(result.records[0]._fields[0]);
+            userID = result.records[0]._fields[0];
             res.json({login: 1});
             console.log(userID);
         } else {
             res.json({login: 0})
         }
-    }).then(() => session.close());
+    }).then();
 });
 
 app.post('/api/register', (req, res) => {
-
+    const {username, pass, name, surname, date, sex, cityResidence, genreFav} = req.body;
+    let query = `CREATE (u:User {username: '${username}', password: '${pass}', name: '${name}', surname: '${surname}', date: '${date}, sex: '${sex}'})
+        MERGE (u)-[:]->(c:City {city: '${cityResidence}'}) MERGE (u)-[:]->(g:Genre {genre: '${genreFav}'}) RETURN u.username`;
+    const request = session.run(query);
+    request.then(result => { 
+        if(result.records.length > 0) {
+            userID = result.records[0]._fields[0];
+            res.json({login: 1});
+        } else {
+            res.json({login: 0})
+        }
+    }).then();
 });
 
-app.put('/api/changePass', (req, res) => {
-
-});
-
-app.get('/api/allConcerts', (req, res) => {
-    let query = `MATCH (n:Concierto) RETURN n`;
+app.get('/api/getConcertsCityUser', (req, res) => {
+    session = driver.session();
+    let query = `MATCH (c:Concierto)-[:REALIZA]->(r:Room), (u:User)-[:RESIDE]->(ci:City), (r:Room)-[:PERTENECE]->(ci:City), (a:Artist)-[:ACTUA]->(c:Concierto), (a:Artist)-[:EN_GENERO]->(g:Genre)
+        WHERE u.name = '${userID}'
+        RETURN c.concertID, c.name, c.hourStart, c.price, c.date, ci.city, g.genre, a.name, r.room`;
     const request = session.run(query);
 
     request.then(result => { 
@@ -77,8 +78,16 @@ app.get('/api/allConcerts', (req, res) => {
         let concerts = [];
 
         result.records.forEach((current) => {
-            let concert = {
-                name: current._fields[0].properties.name
+            const concert = {
+                id: current._fields[0].low,
+                name: current._fields[1],
+                hourStart: current._fields[2],
+                price: current._fields[3],
+                date: current._fields[4],
+                city: current._fields[5],
+                genre: current._fields[6],
+                artist: current._fields[7],
+                room: current._fields[8],
             };
             concerts.push(concert);
         })
@@ -86,54 +95,49 @@ app.get('/api/allConcerts', (req, res) => {
     }).catch();
 });
 
-// Algoritmo basado en el contenido sin importar el usuario
-app.get('/api/bestConcerts', (re, res) => {
-    let query = `MATCH (n:Concierto) RETURN n`;
+app.get('/api/allGenres', (req, res) => {
+    
+});
+
+app.get('/api/allArtists', (req, res) => {
+    session = driver.session();
+    let query = `MATCH (a:Artist)-[:EN_GENERO]->(g:Genre) RETURN a.name, g.genre`;
     const request = session.run(query);
-
-    
-    // Obtengo todos los conciertos
     request.then(result => { 
-        let concerts = [];
+        let artists = [];
         result.records.forEach((current) => {
-            let concert = {
-                artist: current._fields[0].properties.artist,
-                city: current._fields[0].properties.city,
-                genre: current._fields[0].properties.genre,
-                score: 0
+            let artist = {
+                name: current._fields[0],
+		        genre: current._fields[1]
             };
-            concerts.push(concert);
-        });
-        let cityUser = 'Madrid';
-        let genreUser = 'Pop';
-    
-        concerts.forEach((current) => {
-            if(current.city == cityUser) {
-                current.score += 1;
-            }
-            if(current.genre == genreUser) {
-                current.score += 1;
-            }
-            //console.log(current);
-        });
-        //console.log(concerts);
-        let conciertosOrdenados = concerts.sort((a, b) => a.score - b.score).reverse();
-        console.log(conciertosOrdenados);
-        res.send(conciertosOrdenados);
-    });
+            artists.push(artist);
+        })
+        res.send(artists);
+    }).catch();
 });
 
-
-app.get('/api/artistsOfMoment', (req, res) => {
+app.get('/api/allRooms', (req, res) => {
+    session = driver.session();
+    let query = `MATCH (r:Room)-[:PERTENECE]->(c:City) RETURN  r.room, c.city`;
+    const request = session.run(query);
+    request.then(result => { 
+        let rooms = [];
+        result.records.forEach((current) => {
+            let room = {
+                name: current._fields[0], 
+		        city: current._fields[1] 
+            };
+            rooms.push(room);
+        })
+        res.send(rooms);
+    }).catch();
 });
 
-app.get('/api/mostPopularArtists', (req, res) => {
-
-});
-
-
-app.get('/api/getConcertsLike', (req, res) => {
-    let query = `MATCH (n:Concierto)<-[:ME_GUSTA]-(u:User) WHERE u.name='Pedro' RETURN n`;
+// MODIFICAR
+app.get('/api/allConcerts', (req, res) => {
+    session = driver.session();
+    let query = `MATCH (c:Concierto)-[:REALIZA]->(r:Room), (r:Room)-[:PERTENECE]->(ci:City), (a:Artist)-[:ACTUA]->(c:Concierto), (a:Artist)-[:EN_GENERO]->(g:Genre)
+    RETURN c.concertID, c.name, c.hourStart, c.price, c.date, ci.city, g.genre, a.name, r.room`;
     const request = session.run(query);
 
     request.then(result => { 
@@ -141,79 +145,458 @@ app.get('/api/getConcertsLike', (req, res) => {
         let concerts = [];
 
         result.records.forEach((current) => {
-            let concert = {
-                name: current._fields[0].properties.name,
-                city: current._fields[0].properties.city
+            const concert = {
+                id: current._fields[0].low,
+                name: current._fields[1],
+                hourStart: current._fields[2],
+                price: current._fields[3],
+                date: current._fields[4],
+                city: current._fields[5],
+                genre: current._fields[6],
+                artist: current._fields[7],
+                room: current._fields[8],
+            };
+
+            concerts.push(concert);
+        })
+        res.send(concerts);
+    }).catch();
+});
+
+// CONCIERTOS CON MAS LIKES
+// AJUSTAR LA DEVOLUCIÓN
+app.get('/api/moreLikesConcerts', (req, res) => {
+    session = driver.session();
+    let query = `MATCH (u:User)-[m:ME_GUSTA]->(c:Concierto), (c:Concierto)-[:REALIZA]->(r:Room), (r:Room)-[:PERTENECE]->(ci:City), (a:Artist)-[:ACTUA]->(c:Concierto), (a:Artist)-[:EN_GENERO]->(g:Genre)
+        RETURN c.concertID, c.name, c.hourStart, c.price, c.date, ci.city, g.genre, a.name, r.room, count(m) ORDER BY count(m) DESC`;
+    const request = session.run(query);
+
+    request.then(result => { 
+        
+        let concerts = [];
+
+        result.records.forEach((current) => {
+            const concert = {
+                id: current._fields[0].low,
+                name: current._fields[1],
+                hourStart: current._fields[2],
+                price: current._fields[3],
+                date: current._fields[4],
+                city: current._fields[5],
+                genre: current._fields[6],
+                artist: current._fields[7],
+                room: current._fields[8],
             };
             concerts.push(concert);
         })
-        //res.send(concerts);
-        console.log(concerts);
+        res.send(concerts);
+    }).catch();
+});
+
+// SALAS CON MAS CONCIERTOS
+// AJUSTAR 
+app.get('/api/moreConcertsRooms', (req, res) => {
+    session = driver.session();
+    let query = `MATCH (c:Concierto)-[:REALIZA]->(r:Room), (r:Room)-[:PERTENECE]->(ci:City)
+    RETURN r.room, ci.city, count(c) ORDER BY count(c) DESC`;
+    const request = session.run(query);
+
+    request.then(result => { 
+        
+        let rooms = [];
+
+        result.records.forEach((current) => {
+            let room = {
+                name: current._fields[0], 
+		        city: current._fields[1] 
+            };
+            rooms.push(room);
+        })
+        res.send(rooms);
+    }).catch();
+});
+
+// SALAS MEJOR VALORADAS
+
+
+// ARTISTAS CON MAS CONCIERTOS
+// Ajustar
+app.get('/api/artistWithMoreConcerts', (req, res) => {
+    session = driver.session();
+    let query = `MATCH (a:Artist)-[:ACTUA]->(c:Concierto)
+        RETURN a.name, count(c) ORDER BY count(c) DESC`;
+    const request = session.run(query);
+
+    request.then(result => { 
+        
+        let artists = [];
+
+        result.records.forEach((current) => {
+            let artist = {
+                name: current._fields[0],
+                genre: current._fields[1]
+            };
+            artists.push(artist);
+        })
+        res.send(artists);
+    }).catch();
+});
+
+// ARTISTAS CON MAS SEGUIDORES
+// JUSTAR
+app.get('/api/artistWithMoreFollowers', (req, res) => {
+    session = driver.session();
+    let query = `MATCH (a:Artist)-[:ACTUA]->(c:Concierto), (a:Artist)-[:EN_GENERO]->(g:Genre)
+    RETURN a.name,g.genre, count(c) ORDER BY count(c) DESC`;
+    const request = session.run(query);
+
+    request.then(result => { 
+        
+        let artists = [];
+
+        result.records.forEach((current) => {
+            let artist = {
+                name: current._fields[0],
+		        genre: current._fields[1]
+            };
+            artists.push(artist);
+        })
+        res.send(artists);
+    }).catch();
+});
+
+app.get('/api/artistsOfMoment', (req, res) => {
+});
+
+
+app.get('/api/mostPopularArtists', (req, res) => {
+
+});
+
+// SALAS MEJOR VALORADAS
+app.get('/api/getMoreValuationRooms', (req, res) => {
+    session = driver.session();
+    let query = `MATCH (u:User)-[v:VALORA]->(r:Room), (r:Room)-[:PERTENECE]->(c:City) RETURN  r.room, avg(v.valoracion), c.city ORDER BY avg(v.valoracion) DESC`;
+    const request = session.run(query);
+
+    request.then(result => { 
+        
+        let rooms = [];
+
+        result.records.forEach((current) => {
+            let room = {
+                name: current._fields[0], 
+                val: current._fields[1].low,
+                city: current._fields[2] 
+            };
+            rooms.push(room);
+        });
+        res.send(rooms);
+    }).catch();
+});
+
+
+// TODAS LAS VALORACIONES DE UN USUARIO
+app.get('/api/getValuationRooms', (req, res) => {
+    session = driver.session();
+    let query = `MATCH (u:User)-[v:VALORA]->(r:Room), (r:Room)-[:PERTENECE]->(c:City) WHERE u.name='${userID}' RETURN  r.room, v.valoracion, c.city`;
+    const request = session.run(query);
+
+    request.then(result => { 
+        
+        let rooms = [];
+
+        result.records.forEach((current) => {
+            let room = {
+                name: current._fields[0], 
+                val: current._fields[1].low,
+                city: current._fields[2]
+            };
+            rooms.push(room);
+        });
+        res.send(rooms);
+    }).catch();
+});
+
+app.post('/api/getConcert', (req, res) => {
+    const {idConcert} = req.body;
+    session = driver.session();
+    let query = `MATCH (c:Concierto)-[:REALIZA]->(r:Room), (r:Room)-[:PERTENECE]->(ci:City), (a:Artist)-[:ACTUA]->(c:Concierto), (a:Artist)-[:EN_GENERO]->(g:Genre)
+        WHERE c.concertID=${idConcert} RETURN c.concertID, c.name, c.hourStart, c.price, c.date, ci.city, g.genre, a.name, r.room`;
+    const request = session.run(query);
+
+    request.then(result => { 
+        
+        let concerts = [];
+
+        result.records.forEach((current) => {
+            
+            const concert = {
+                id: current._fields[0].low,
+                name: current._fields[1],
+                hourStart: current._fields[2],
+                price: current._fields[3],
+                date: current._fields[4],
+                city: current._fields[5],
+                genre: current._fields[6],
+                artist: current._fields[7],
+                room: current._fields[8]
+            };
+            concerts.push(concert);
+        });
+        res.send(concerts);
+    }).catch();
+});
+
+// MODIFICAR
+app.get('/api/getConcertsLike', (req, res) => {
+    session = driver.session();
+    let query = `MATCH (u:User)-[m:ME_GUSTA]->(c:Concierto), (c:Concierto)-[:REALIZA]->(r:Room), (r:Room)-[:PERTENECE]->(ci:City), (a:Artist)-[:ACTUA]->(c:Concierto), (a:Artist)-[:EN_GENERO]->(g:Genre)
+        WHERE u.name='${userID}' RETURN c.concertID, c.name, c.hourStart, c.price, c.date, ci.city, g.genre, a.name, r.room`;
+    const request = session.run(query);
+
+    request.then(result => { 
+        
+        let concerts = [];
+
+        result.records.forEach((current) => {
+            
+            const concert = {
+                id: current._fields[0].low,
+                name: current._fields[1],
+                hourStart: current._fields[2],
+                price: current._fields[3],
+                date: current._fields[4],
+                city: current._fields[5],
+                genre: current._fields[6],
+                artist: current._fields[7],
+                room: current._fields[8],
+            };
+            concerts.push(concert);
+        });
+        res.send(concerts);
+    }).catch();
+});
+
+// MODIFICAR
+app.get('/api/getArtistsFollowing', (req, res) => {
+    session = driver.session();
+    let query = `MATCH (u:User)-[:SIGUE]->(a:Artist), (a:Artist)-[:EN_GENERO]->(g:Genre)  WHERE u.name = '${userID}' RETURN a.name,  g.genre`;
+    const request = session.run(query);
+    request.then(result => { 
+        
+        let artists = [];
+
+        result.records.forEach((current) => {
+            
+            let artist = {
+                name: current._fields[0],
+		        genre: current._fields[1]
+            };
+            artists.push(artist);
+            
+        })
+        res.send(artists);
+    }).catch();
+});
+
+// Seguir a un artista
+app.post('/api/followArtist', (req, res) => {
+    session = driver.session();
+    const {idArtist} = req.body;
+    let query = `MATCH(u:User) WHERE u.name = '${userID}' 
+        MATCH (a:Artist) WHERE a.name = '${idArtist}'
+        MERGE (u)-[:SIGUE]->(a)
+        RETURN a, u`;
+    const request = session.run(query);
+    request.then(result => { 
+        if(result.records.length > 0) {
+            res.json({r: 1});
+        } else {
+            res.json({r: 0})
+        }
+    }).catch();
+});
+
+// Dejar de seguir a un artista
+app.post('/api/stopFollowArtist', (req, res) => {
+    session = driver.session();
+    const {idArtist} = req.body;
+    let query = `MATCH (u:User)-[s:SIGUE]->(a:Artist)
+        WHERE u.name = '${userID}' AND a.name = '${idArtist}'
+        DELETE s
+        RETURN u, a`;
+    const request = session.run(query);
+    request.then(result => { 
+        if(result.records.length > 0) {
+            res.json({r: 1});
+        } else {
+            res.json({r: 0})
+        }
     }).catch();
 });
 
 // Pasar parametros por la url
 // Dar me gusta a un concierto
-app.post('/api/likeConcert/:id', (req, res) => {
-    let idUser = req.params.id;
-    console.log(idUser);
+app.post('/api/likeConcert', (req, res) => {
+    session = driver.session();
+    const {idConcert} = req.body;
+    let query = `MATCH (u:User) WHERE u.name = '${userID}' 
+    MATCH (c:Concierto) WHERE c.concertID = ${idConcert}
+    MERGE (u)-[:ME_GUSTA]->(c)
+    RETURN u, c`;
+    const request = session.run(query);
+    request.then(result => { 
+        if(result.records.length > 0) {
+            res.json({r: 1});
+        } else {
+            res.json({r: 0})
+        }
+    }).catch();
 });
 
 // Pasar parametros por la url
 // Quitar me gusta a un concierto
-app.delete('/api/dislikeConcert/:id', (req, res) => {
-    let idUser = req.params.id;
-    console.log(idUser);
+app.delete('/api/dislikeConcert', (req, res) => {
+    session = driver.session();
+    const {idConcert} = req.body;
+    console.log("LLEGA petic" + idConcert + "  "+ userID);
+    let query = `MATCH (u:User)-[m:ME_GUSTA]->(c:Concierto)
+        WHERE u.name = '${userID}' AND c.concertID = ${idConcert}
+        DELETE m
+        RETURN u, c`;
+    const request = session.run(query);
+    request.then(result => { 
+        if(result.records.length > 0) {
+            res.json({r: 1});
+        } else {
+            res.json({r: 0})
+        }
+    }).catch();
 });
 
 //Modificar
-app.get('/api/valorarSala', (req, res) => {
+app.post('/api/valorarSala', (req, res) => {
+    session = driver.session();
+    const {idRoom, val} = req.body;
     let query = `MATCH (u:User) 
-    WHERE (u.name = 'Pedro')
-    MATCH (r:Room) 
-    WHERE (r.room = 'WiZink Center')
-    MERGE (u)-[:VALORA {valoracion: 5}]->(r)
-    RETURN u, r`
+        WHERE (u.name = '${userID}')
+        MATCH (r:Room) 
+        WHERE (r.room = '${idRoom}')
+        MERGE (u)-[:VALORA {valoracion: ${val}}]->(r)
+        RETURN u, r`;
+    const request = session.run(query);
+    request.then(result => { 
+        if(result.records.length > 0) {
+            res.json({r: 1});
+        } else {
+            res.json({r: 0})
+        }
+    }).catch();
 });
 
 //Modificar
-app.get('/api/modificarValoracionSala', (req, res) => {
-    let query = `MATCH (u:User)-[v:VALORA {valoracion: 4}]->(r:Room)
-    WHERE (u.name = 'Pedro') AND (r.room = 'WiZink Center')
-    SET v.valoracion = 1
-    RETURN u, r`
+app.post('/api/modificarValoracionSala', (req, res) => {
+    session = driver.session();
+    const {idRoom, val} = req.body;
+    let query = `MATCH (u:User)-[v:VALORA]->(r:Room)
+        WHERE (u.name = '${userID}') AND (r.room = '${idRoom}')
+        SET v.valoracion = '${val}'
+        RETURN u, r`;
+    const request = session.run(query);
+    request.then(result => { 
+        if(result.records.length > 0) {
+            res.json({r: 1});
+        } else {
+            res.json({r: 0})
+        }
+    }).catch();
 });
 
 // Modificar
-app.get('/api/eliminarValSala', (req, res) => {
-    let query = `MATCH (u:User)-[v:VOTA]->(r:Room)
-    WHERE (u.name = 'Pedro') AND (r.room = 'WiZink Center')
-    DELETE v
-    RETURN u, r`
+app.delete('/api/eliminarValSala', (req, res) => {
+    session = driver.session();
+    const {idRoom} = req.body;
+    let query = `MATCH (u:User)-[v:VALORA]->(r:Room)
+        WHERE (u.name = '${userID}') AND (r.room = '${idRoom}')
+        DELETE v
+        RETURN u, r`;
+    const request = session.run(query);
+    request.then(result => { 
+        if(result.records.length > 0) {
+            res.json([1]);
+        } else {
+            res.json({r: 0})
+        }
+    }).catch();
 });
 
 
+app.get('/api/recomendedArtists', (req, res) => {
+    session = driver.session();
+    let query = `MATCH (u1:User {name: '${userID}'})-[:SIGUE]->(artist1:Artist)
+        WITH u1, collect(id(artist1)) AS u1Artist 
+        MATCH (u2:User)-[:SIGUE]->(artist2:Artist) WHERE u1 <> u2
+        WITH u1, u1Artist, u2, collect(id(artist2)) AS u2Artist
+        WITH u1, u2, u1Artist, gds.similarity.jaccard(u1Artist, u2Artist) AS Similarity ORDER BY Similarity DESC
+        MATCH (u:User)-[:SIGUE]->(a:Artist) WHERE u.name = u2.name
+        WITH a, u1
+        MATCH (u:User)-[:SIGUE]->(aAux:Artist), (a)-[:EN_GENERO]-(g:Genre) WHERE u.name = u1.name AND NOT exists((u1)-[:SIGUE]->(a))
+        RETURN DISTINCT(a.name), g.genre`;
 
-
-
-
-
-app.get('/api/algoritmo1', (req, res) => {
-    // Seguidores y reproducciones 
-
-    // Valoraciones artistas y sala
-
-    // Numero de me gustas
-
-
+    const request = session.run(query);
+    request.then(result => { 
+        var artists = [];
+        result.records.forEach(current => {
+            let artist = {
+                name: current._fields[0],
+                genre: current._fields[1]
+            };
+            artists.push(artist);
+        });
+        res.send(artists);
+    }).catch().then();
 });
 
-
-
+// ADAPTAR LOS DATOS QUE DEVUELVE
+app.post('/api/concertsSimilarities', (req, res) => {
+    session = driver.session();
+    const {artist} = req.body;
+    let query = ` MATCH (c:Concierto)-[:REALIZA]->(r:Room), (r)-[:PERTENECE]->(i:City), (a:Artist)-[:ACTUA]->(c:Concierto), (a:Artist)-[:EN_GENERO]->(g:Genre) WHERE a.name = '${artist}'
+        WITH  c, r, i, a, g
+        MATCH (cAux:Concierto)-[:REALIZA]->(rAux:Room), (rAux)-[:PERTENECE]->(iAux:City), (aAux:Artist)-[:ACTUA]->(cAux:Concierto), (aAux:Artist)-[:EN_GENERO]->(gAux:Genre) WHERE aAux <> a
+        WITH  c, r, i, a, g, cAux, rAux, iAux, aAux, gAux,
+        collect(CASE gAux.genre WHEN g.genre THEN 2 ELSE 0 END) AS genre, 
+        collect(CASE rAux.room WHEN r.room THEN 2 ELSE 0 END) AS room, 
+        collect(CASE iAux.city WHEN i.city THEN 2 ELSE 0 END) AS city
+        WITH genre, room, city, cAux,iAux, gAux, aAux, rAux,
+        gds.similarity.cosine([2,2,2], genre+room+city) AS coseno WHERE coseno >0 
+        RETURN  cAux.concertID, cAux.name,cAux.hourStart, cAux.price, cAux.date, iAux.city, gAux.genre, aAux.name, rAux.room , coseno ORDER BY coseno DESC;` 
+    const request = session.run(query);
+    request.then(result => { 
+        var concerts = [];
+        result.records.forEach(current => {
+            const concert = {
+                id: current._fields[0].low,
+                name: current._fields[1],
+                hourStart: current._fields[2],
+                price: current._fields[3],
+                date: current._fields[4],
+                city: current._fields[5],
+                genre: current._fields[6],
+                artist: current._fields[7],
+                room: current._fields[8],
+            };
+            concerts.push(concert);
+        });
+        res.send(concerts);
+    }).catch().then(() => session.close());
+});
 
 
 // Algoritmo basado en el contenido del usuario (actividad del usuario - me gustas)
 app.get('/api/actividadUsuario', async (req, res) => {
+    session = driver.session();
     let user = "Pedro"
     // Devuelve conciertos que le gustan al usuario 
     let queryConcertsMG = `MATCH (u:User)-[:ME_GUSTA]->(c:Concierto)
@@ -327,6 +710,8 @@ app.get('/api/actividadUsuario', async (req, res) => {
             let vProfileUser = [vGenreFavUser, 1, vCityResidenceUser, 1, vHorarioM, vHorarioT, vHorarioN, vPrecioMedioUser, vValArtista, vValSala];
             console.log("Perfil user: " +vProfileUser)
 
+            session = driver.session();
+
             // Extraer datos del resto de conciertos
             let queryRestConcerts = `MATCH (u:User)
                 MATCH (c:Concierto)
@@ -422,7 +807,7 @@ app.get('/api/actividadUsuario', async (req, res) => {
                         let pearson = covarianza(vProfileUser, vConcert)/Math.sqrt(varianza(vProfileUser)*varianza(vConcert));
                         console.log(pearson);
                         
-                        resultsPearson.push({id: concert.id, p: pearson});
+                        resultsPearson.push({concert: concert, p: pearson});
                     });
                     console.log(resultsPearson);
                     
@@ -431,10 +816,11 @@ app.get('/api/actividadUsuario', async (req, res) => {
                 // Ordenarlos por similitud en base a pearson
                 let ordenados = resultsPearson.sort((a, b) => b.p - a.p);
                 console.log("ordenados: " + ordenados);
+                res.send(ordenados);
             })
         } else {
             // Si no hay me gustas
-
+            //Mejores conciertos
         }
 
         
@@ -442,7 +828,23 @@ app.get('/api/actividadUsuario', async (req, res) => {
     });
 });
 
+// PEARSON PARA DOS USUARIOS
+app.get('/api/algoritmoUsuarioAUsuario', (req, res) => {
+
+});
+
+app.get('/api/algoritmoHibrido', (req, res) => {
+    // Seguidores y reproducciones 
+
+    // Valoraciones artistas y sala
+
+    // Numero de me gustas
+
+
+});
+
 async function getFollowingArtists(user) {
+    session = driver.session();
     let query = `MATCH (u:User)-[:SIGUE]->(a:Artist) WHERE u.name = '${user}' RETURN a`
     const artists = await session.run(query);
     var a = [];
@@ -453,6 +855,7 @@ async function getFollowingArtists(user) {
 }
 
 async function getAllValuation(user) {
+    session = driver.session();
     let query = `MATCH (u:User)-[v:VALORA]->(r:Room) WHERE u.name = '${user}' RETURN r, v.valoracion`;
     const valuation = await session.run(query);
     var v = [];
@@ -465,6 +868,7 @@ async function getAllValuation(user) {
 }
 
 async function getGenreFavUser(user) {
+    session = driver.session();
     let query = `MATCH (u:User)-[:FAVORITO]->(g:Genre) WHERE u.name = '${user}' RETURN g`;
     const genre = await session.run(query);
     let g = genre.records[0]._fields[0].properties.name;
@@ -472,6 +876,7 @@ async function getGenreFavUser(user) {
 }
 
 async function getCityResidence(user) {
+    session = driver.session();
     let query = `MATCH (u:User)-[:RESIDE] ->(c:City) WHERE u.name = '${user}' RETURN c`;
     const genre = await session.run(query);
     let c = genre.records[0]._fields[0].properties.id_city;

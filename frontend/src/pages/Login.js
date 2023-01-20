@@ -4,21 +4,22 @@ import axios from "axios";
 import TextField from '@mui/material/TextField';
 import Button from '@mui/material/Button';
 import Main from './Main';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 
 function Login() {
 
   const [details, setDetails] = useState({user:'', pass:''});
+  const navigate = useNavigate();
 
   const handleSubmit = () => {
-    /*console.log(details.user + " " + details.pass);
-    axios.post('/crearNodo', {
+    axios.post('/api/login', {
       user:details.user, pass:details.pass
     }).then(response => {
-      console.log("Enviado");
+      navigate('/inicio')
+      console.log(response);
     }).catch(error => {
       console.log(error);
-    });*/
+    });
   };
 
 
@@ -32,7 +33,7 @@ function Login() {
           onChange={e => setDetails({...details, user: e.target.value})} />
         <TextField id="outlined-basic" label="Pass" variant="outlined" 
           onChange={e => setDetails({...details, pass: e.target.value})} />
-        <Link to='/inicio'><Button variant="text">Registrarse</Button></Link>
+        <Button onClick={handleSubmit} variant="text">Iniciar sesion</Button>
       </header>
     </div>
   );
