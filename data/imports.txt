@@ -1,63 +1,3 @@
-LOAD CSV WITH HEADERS FROM 'file:///users.csv' AS row
-WITH row
-WHERE row.userID IS NOT NULL
-
-MERGE (u:User {
-        userID: toInteger(row.userID),
-        name: row.name,
-        surname: row.surname,
-	date: row.date,
-	sex: row.sex
-})
-
-MERGE (g:Genre {
-    name: row.id_genre_fav
-})
-
-MERGE (c:City {
-    id_city: row.id_city
-})
-
-MERGE (u)-[:FAVORITO]->(g)
-
-MERGE (u)-[:RESIDE]->(c)
-
-RETURN u, g, c
-
-
-LOAD CSV WITH HEADERS FROM 'file:///conciertos.csv' AS row
-WITH row
-WHERE row.conciertoId IS NOT NULL
-
-MERGE (c:Concierto {
-userID: toInteger(row.userID),
-    name: row.name,
-    city: row.city,
-    genre: row.genre
-})
-
-RETURN c
-
-MATCH (u:User) 
-WHERE (u.name = 'Pedro')
-MATCH (c:Concierto) 
-WHERE (c.name = 'Capitan Cobarde')
-
-MERGE (u)-[:ME_GUSTA]->(c)
-
-RETURN u, c
-
-MATCH (c:Concierto)
-WHERE c.name = 'Aitana'
-
-MATCH (u:User)
-WHERE (u.name='Pedro')
-
-MERGE (u)-[:ME_GUSTA]->(c)
-
-RETURN u, c
-
-
 
 
 // Importando conciertos
@@ -78,8 +18,7 @@ MERGE (l:City {
 })
 
 MERGE (a:Artist {
-    name: row.artist
-})
+    name: row.artist)
 
 MERGE (g:Genre {
     genre: row.genre
