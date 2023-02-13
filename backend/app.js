@@ -95,9 +95,6 @@ app.get('/api/getConcertsCityUser', (req, res) => {
     }).catch();
 });
 
-app.get('/api/allGenres', (req, res) => {
-    
-});
 
 app.get('/api/allArtists', (req, res) => {
     session = driver.session();
@@ -265,13 +262,6 @@ app.get('/api/artistWithMoreFollowers', (req, res) => {
     }).catch();
 });
 
-app.get('/api/artistsOfMoment', (req, res) => {
-});
-
-
-app.get('/api/mostPopularArtists', (req, res) => {
-
-});
 
 // SALAS MEJOR VALORADAS
 app.get('/api/getMoreValuationRooms', (req, res) => {
@@ -928,13 +918,7 @@ function mediaAritmetica(x) {
     return media;
 }
 
-// Algoritmo basado en el contenido del usuario (busqueda de un concierto actual)
 
-// Algoritmo de filtrado colaborativo
-
-// Algoritmo hibrido
-
-// Algoritmo extra (paquetes de conciertos)
 
 app.get('/pruebas', async (req, res) => {
     let user = 'Pedro';

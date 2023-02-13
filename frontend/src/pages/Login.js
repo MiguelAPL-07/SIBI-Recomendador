@@ -27,7 +27,7 @@ function Login() {
     <div className="App">
       <header className="App-header">
         <p>
-          Creando el recomendador!
+          LoveLiveConcerts
         </p>
         <TextField id="outlined-basic" label="User" variant="outlined"
           onChange={e => setDetails({...details, user: e.target.value})} />
